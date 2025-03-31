@@ -57,7 +57,12 @@ def load_to_bigquery(gcs_uri):
     )
 
     load_job = client.load_table_from_uri(gcs_uri, table_id, job_config=job_config)
-    load_job.result()
+    load_job.result()  # Waits for job completion
+
+    # Check for errors
+    if load_job.errors:
+        logging.error(f"BigQuery Load Job failed: {load_job.errors}")
+        raise Exception(f"BigQuery Load Job failed: {load_job.errors}")
 
     logging.info(f"Data loaded into BigQuery: {table_id}")
     return f"Data loaded into {table_id}"
