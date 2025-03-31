@@ -1,0 +1,54 @@
+name: Deploy Cloud Run Job
+
+on:
+  push:
+    branches:
+      - main  # Change if a different branch should trigger the deployment
+
+env:
+  PROJECT_ID: daring-atrium-454004-n4
+  REGION: us-central1
+  REPO_NAME: cloud-run-repo  # Updated repository name
+  IMAGE_NAME: employee-csv-job  # Updated image name
+  JOB_NAME: employee-data-job  # Updated Cloud Run Job name
+  SERVICE_ACCOUNT: 835341756220-compute@developer.gserviceaccount.com
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
+
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t us-central1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:latest .
+          docker push us-central1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:latest
+
+      - name: Deploy Cloud Run Job
+        run: |
+          gcloud run jobs deploy $JOB_NAME \
+            --image us-central1-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:latest \
+            --region $REGION \
+            --service-account $SERVICE_ACCOUNT \
+            --max-retries 2 \
+            --tasks 1 \
+            --set-env-vars "BUCKET_NAME=assgnment_1,DATASET_NAME=assgnment_ds,TABLE_NAME=assignment_t"
